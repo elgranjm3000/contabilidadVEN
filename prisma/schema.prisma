@@ -1,0 +1,298 @@
+// prisma/schema.prisma - Schema adaptado para MySQL
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Company {
+  id               String    @id @default(uuid()) @db.VarChar(36)
+  rif              String    @unique @db.VarChar(12)
+  businessName     String    @map("business_name") @db.VarChar(255)
+  commercialName   String?   @map("commercial_name") @db.VarChar(255)
+  address          String?   @db.Text
+  phone            String?   @db.VarChar(20)
+  email            String?   @db.VarChar(100)
+  economicActivity String?   @map("economic_activity") @db.VarChar(10)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
+  //updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  // Relaciones
+  companyUsers      CompanyUser[]
+  accounts          Account[]
+  costCenters       CostCenter[]
+  journalEntries    JournalEntry[]
+  invoices          Invoice[]
+  accountingPeriods AccountingPeriod[]
+  auditLogs         AuditLog[]
+
+  @@map("companies")
+}
+
+model User {
+  id                String    @id @default(uuid()) @db.VarChar(36)
+  email             String    @unique @db.VarChar(100)
+  passwordHash      String?   @map("password_hash") @db.VarChar(255)
+  firstName         String?   @map("first_name") @db.VarChar(100)
+  lastName          String?   @map("last_name") @db.VarChar(100)
+  role              UserRole  @default(USER)
+  twoFactorEnabled  Boolean   @default(false) @map("two_factor_enabled")
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
+
+  // Relaciones
+  companyUsers         CompanyUser[]
+  createdJournalEntries JournalEntry[] @relation("CreatedBy")
+  approvedJournalEntries JournalEntry[] @relation("ApprovedBy")
+  closedPeriods        AccountingPeriod[]
+  auditLogs            AuditLog[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  ACCOUNTANT
+  AUDITOR
+  USER
+}
+
+model CompanyUser {
+  id          String   @id @default(uuid()) @db.VarChar(36)
+  companyId   String   @map("company_id") @db.VarChar(36)
+  userId      String   @map("user_id") @db.VarChar(36)
+  role        UserRole
+  permissions Json?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+
+  // Relaciones
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, userId], name: "unique_company_user")
+  @@map("company_users")
+}
+
+model AccountType {
+  id      Int           @id @default(autoincrement())
+  code    String        @unique @db.VarChar(10)
+  name    String        @db.VarChar(100)
+  nature  AccountNature
+
+  // Relaciones
+  accounts Account[]
+
+  @@map("account_types")
+}
+
+enum AccountNature {
+  DEBIT
+  CREDIT
+}
+
+model Account {
+  id             String      @id @default(uuid()) @db.VarChar(36)
+  companyId      String      @map("company_id") @db.VarChar(36)
+  code           String      @db.VarChar(20)
+  name           String      @db.VarChar(200)
+  accountTypeId  Int         @map("account_type_id")
+  parentId       String?     @map("parent_id") @db.VarChar(36)
+  level          Int         @default(1)
+  isActive       Boolean     @default(true) @map("is_active")
+  acceptsEntries Boolean     @default(true) @map("accepts_entries")
+  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamp(0)
+
+  // Relaciones
+  company           Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  accountType       AccountType           @relation(fields: [accountTypeId], references: [id])
+  parent            Account?              @relation("AccountHierarchy", fields: [parentId], references: [id])
+  children          Account[]             @relation("AccountHierarchy")
+  journalEntryDetails JournalEntryDetail[]
+
+  @@unique([companyId, code], name: "unique_company_code")
+  @@index([companyId, code], name: "idx_company_code")
+  @@index([accountTypeId], name: "idx_account_type")
+  @@index([parentId], name: "idx_parent")
+  @@map("accounts")
+}
+
+model CostCenter {
+  id          String    @id @default(uuid()) @db.VarChar(36)
+  companyId   String    @map("company_id") @db.VarChar(36)
+  code        String    @db.VarChar(20)
+  name        String    @db.VarChar(200)
+  description String?   @db.Text
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
+
+  // Relaciones
+  company             Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  journalEntryDetails JournalEntryDetail[]
+
+  @@unique([companyId, code], name: "unique_company_cost_center")
+  @@map("cost_centers")
+}
+
+model JournalEntry {
+  id           String        @id @default(uuid()) @db.VarChar(36)
+  companyId    String        @map("company_id") @db.VarChar(36)
+  entryNumber  String        @map("entry_number") @db.VarChar(20)
+  reference    String?       @db.VarChar(100)
+  description  String        @db.Text
+  entryDate    DateTime      @map("entry_date") @db.Date
+  totalDebit   Decimal       @default(0.00) @map("total_debit") @db.Decimal(15, 2)
+  totalCredit  Decimal       @default(0.00) @map("total_credit") @db.Decimal(15, 2)
+  status       EntryStatus   @default(DRAFT)
+  createdBy    String        @map("created_by") @db.VarChar(36)
+  approvedBy   String?       @map("approved_by") @db.VarChar(36)
+  approvedAt   DateTime?     @map("approved_at") @db.Timestamp(0)
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamp(0)
+
+  // Relaciones
+  company    Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  creator    User                  @relation("CreatedBy", fields: [createdBy], references: [id])
+  approver   User?                 @relation("ApprovedBy", fields: [approvedBy], references: [id])
+  details    JournalEntryDetail[]
+
+  @@unique([companyId, entryNumber], name: "unique_company_entry")
+  @@index([companyId, entryDate], name: "idx_company_date")
+  @@index([status], name: "idx_status")
+  @@map("journal_entries")
+}
+
+enum EntryStatus {
+  DRAFT
+  APPROVED
+  REVERSED
+}
+
+model JournalEntryDetail {
+  id              String    @id @default(uuid()) @db.VarChar(36)
+  journalEntryId  String    @map("journal_entry_id") @db.VarChar(36)
+  accountId       String    @map("account_id") @db.VarChar(36)
+  costCenterId    String?   @map("cost_center_id") @db.VarChar(36)
+  description     String?   @db.Text
+  debit           Decimal   @default(0.00) @db.Decimal(15, 2)
+  credit          Decimal   @default(0.00) @db.Decimal(15, 2)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
+
+  // Relaciones
+  journalEntry JournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  account      Account      @relation(fields: [accountId], references: [id])
+  costCenter   CostCenter?  @relation(fields: [costCenterId], references: [id])
+
+  @@index([journalEntryId], name: "idx_journal_entry")
+  @@index([accountId], name: "idx_account")
+  @@index([costCenterId], name: "idx_cost_center")
+  @@map("journal_entry_details")
+}
+
+model Invoice {
+  id                  String        @id @default(uuid()) @db.VarChar(36)
+  companyId           String        @map("company_id") @db.VarChar(36)
+  invoiceNumber       String        @map("invoice_number") @db.VarChar(20)
+  invoiceType         InvoiceType   @map("invoice_type")
+  clientRif           String?       @map("client_rif") @db.VarChar(12)
+  clientName          String        @map("client_name") @db.VarChar(255)
+  issueDate           DateTime      @map("issue_date") @db.Date
+  dueDate             DateTime?     @map("due_date") @db.Date
+  subtotal            Decimal       @db.Decimal(15, 2)
+  taxAmount           Decimal       @default(0.00) @map("tax_amount") @db.Decimal(15, 2)
+  retentionIva        Decimal       @default(0.00) @map("retention_iva") @db.Decimal(15, 2)
+  retentionIslr       Decimal       @default(0.00) @map("retention_islr") @db.Decimal(15, 2)
+  total               Decimal       @db.Decimal(15, 2)
+  status              InvoiceStatus @default(PENDING)
+  seniatControlNumber String?       @map("seniat_control_number") @db.VarChar(20)
+  createdAt           DateTime      @default(now()) @map("created_at") @db.Timestamp(0)
+
+  // Relaciones
+  company Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  items   InvoiceItem[]
+
+  @@unique([companyId, invoiceNumber], name: "unique_company_invoice")
+  @@index([companyId, issueDate], name: "idx_company_date")
+  @@index([clientRif], name: "idx_client_rif")
+  @@index([status], name: "idx_status")
+  @@map("invoices")
+}
+
+enum InvoiceType {
+  SALE
+  PURCHASE
+}
+
+enum InvoiceStatus {
+  PENDING
+  PAID
+  CANCELLED
+}
+
+model InvoiceItem {
+  id          String    @id @default(uuid()) @db.VarChar(36)
+  invoiceId   String    @map("invoice_id") @db.VarChar(36)
+  description String    @db.Text
+  quantity    Decimal   @db.Decimal(10, 2)
+  unitPrice   Decimal   @map("unit_price") @db.Decimal(15, 2)
+  total       Decimal   @db.Decimal(15, 2)
+  taxRate     Decimal   @default(16.00) @map("tax_rate") @db.Decimal(5, 2)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
+
+  // Relaciones
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId], name: "idx_invoice")
+  @@map("invoice_items")
+}
+
+model AccountingPeriod {
+  id        String       @id @default(uuid()) @db.VarChar(36)
+  companyId String       @map("company_id") @db.VarChar(36)
+  year      Int
+  month     Int
+  startDate DateTime     @map("start_date") @db.Date
+  endDate   DateTime     @map("end_date") @db.Date
+  status    PeriodStatus @default(OPEN)
+  closedBy  String?      @map("closed_by") @db.VarChar(36)
+  closedAt  DateTime?    @map("closed_at") @db.Timestamp(0)
+  createdAt DateTime     @default(now()) @map("created_at") @db.Timestamp(0)
+
+  // Relaciones
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  closer  User?   @relation(fields: [closedBy], references: [id])
+
+  @@unique([companyId, year, month], name: "unique_company_period")
+  @@index([companyId, year, month], name: "idx_company_year_month")
+  @@map("accounting_periods")
+}
+
+enum PeriodStatus {
+  OPEN
+  CLOSED
+  LOCKED
+}
+
+model AuditLog {
+  id         String    @id @default(uuid()) @db.VarChar(36)
+  userId     String    @map("user_id") @db.VarChar(36)
+  companyId  String    @map("company_id") @db.VarChar(36)
+  action     String    @db.VarChar(50)
+  resource   String    @db.VarChar(50)
+  resourceId String?   @map("resource_id") @db.VarChar(36)
+  oldValues  Json?     @map("old_values")
+  newValues  Json?     @map("new_values")
+  ipAddress  String?   @map("ip_address") @db.VarChar(45)
+  userAgent  String?   @map("user_agent") @db.Text
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
+
+  // Relaciones
+  user    User    @relation(fields: [userId], references: [id])
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@index([userId], name: "idx_user")
+  @@index([companyId], name: "idx_company")
+  @@index([action], name: "idx_action")
+  @@index([createdAt], name: "idx_created_at")
+  @@map("audit_logs")
+}
