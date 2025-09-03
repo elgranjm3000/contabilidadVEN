@@ -175,7 +175,7 @@ export default function JournalPage() {
                 <SelectValue placeholder="Estado" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos los estados</SelectItem>
+                <SelectItem value="0">Todos los estados</SelectItem>
                 <SelectItem value="DRAFT">Borrador</SelectItem>
                 <SelectItem value="APPROVED">Aprobado</SelectItem>
                 <SelectItem value="REVERSED">Reversado</SelectItem>

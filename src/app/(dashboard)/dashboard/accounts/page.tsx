@@ -374,7 +374,7 @@ export default function AccountsPage() {
                 <SelectValue placeholder="Tipo de cuenta" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos los tipos</SelectItem>
+                <SelectItem value="0">Todos los tipos</SelectItem>
                 <SelectItem value="1">Activo</SelectItem>
                 <SelectItem value="2">Pasivo</SelectItem>
                 <SelectItem value="3">Patrimonio</SelectItem>

@@ -357,7 +357,7 @@ export default function InvoicesPage() {
                 <SelectValue placeholder="Filtrar por estado" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos los estados</SelectItem>
+                <SelectItem value="0">Todos los estados</SelectItem>
                 <SelectItem value="PENDING">Pendiente</SelectItem>
                 <SelectItem value="PAID">Pagada</SelectItem>
                 <SelectItem value="CANCELLED">Anulada</SelectItem>
