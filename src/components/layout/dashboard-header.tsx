@@ -10,27 +10,31 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { CompanySelector } from '@/components/company-selector'
+import { signOut, useSession } from 'next-auth/react'
 
 export function DashboardHeader() {
-  const handleLogout = () => {
-    // Aquí irá la lógica de logout
-    console.log('Logout')
+  const { data: session } = useSession()
+
+  const handleLogout = async () => {
+    await signOut({ callbackUrl: '/login' })
   }
 
   return (
     <header className="bg-white shadow-sm border-b border-gray-200">
       <div className="flex items-center justify-between px-6 py-4">
-        {/* Logo */}
-        <div className="flex items-center space-x-3">
-          <Building2 className="h-8 w-8 text-blue-600" />
-          <div>
-            <h1 className="text-xl font-semibold text-gray-900">
-              Contabilidad Venezuela
-            </h1>
-            <p className="text-sm text-gray-500">
-              Empresa Demo C.A.
-            </p>
+        {/* Logo y Selector de Empresa */}
+        <div className="flex items-center space-x-6">
+          <div className="flex items-center space-x-3">
+            <Building2 className="h-8 w-8 text-blue-600" />
+            <div>
+              <h1 className="text-xl font-semibold text-gray-900">
+                Contabilidad Venezuela
+              </h1>
+            </div>
           </div>
+          
+          <CompanySelector />
         </div>
 
         {/* Actions */}
@@ -50,9 +54,11 @@ export function DashboardHeader() {
             <DropdownMenuContent className="w-56" align="end" forceMount>
               <DropdownMenuLabel className="font-normal">
                 <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium leading-none">Admin Sistema</p>
+                  <p className="text-sm font-medium leading-none">
+                    {session?.user?.firstName} {session?.user?.lastName}
+                  </p>
                   <p className="text-xs leading-none text-muted-foreground">
-                    admin@contabilidad.com.ve
+                    {session?.user?.email}
                   </p>
                 </div>
               </DropdownMenuLabel>
